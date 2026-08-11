@@ -1,0 +1,550 @@
+---
+title: "04 - Scaling relationships and variation"
+subtitle: "04_scaling_and_variation.qmd"
+format: 
+  html:
+    embed-resources: true
+bibliography: ../referencias.bib
+eval: true
+warning: false
+knitr:
+  opts_chunk: 
+    message: false
+---
+
+# Overview
+
+This document outlines the investigation of the allometric relationships between threat devices and body size in the male trimorphic *Longiperna concolor*.
+
+```{r load libraries, echo=FALSE}
+# Load libraries
+## Check if they are already installed
+library(here)
+library(DHARMa)
+library(boot)
+library(viridis)
+library(ggplot2)
+```
+
+# Load data
+
+The `MALES` dataset—generated in `01_exploratory_analysis.qmd` and further refined in `02_morph_discrimination.qmd`—contains individual-level information (ID, sex, and morphological measurements) for all *L. concolor* males included in this study. It also provides both the original morph classifications proposed by @zatz2011 and the updated classifications obtained here using our trimodal bivariate mixture model, applying 80%, 85%, 90%, and 95% probability thresholds for morph assignment.
+
+```{r load MALES, echo=FALSE}
+MALES <- readRDS(file = here("data","processed_data","male_morph_data.rds"))
+str(MALES)
+```
+
+# Scaling relationships
+
+Below, we assess whether varying the probability thresholds affects the allometric relationships estimated with the ordinary least squares method. Across all male morphs, the overall pattern remains consistent, although the absolute values change. Alphas remain hypoallometric, betas hyperallometric, and gammas isometric across all threshold values.
+
+```{r glm OLS regressions, echo=FALSE}
+thres <- colnames(MALES[5:ncol(MALES)])
+OLS <- list()
+morphs <- c("Alpha","Beta","Gamma")
+
+for (i in seq_along(thres)) { # loop over probability thresholds (i.e., 80%, 85%, 90%, 95%)
+  MOR <- cbind(MALES[,1:3],
+               Morph = MALES[,thres[i]]) # subset for current threshold
+  
+  OLS[[i]] <- list()
+  
+  for (j in 1:3) { # loop over identified morphs (i.e., alpha, beta and gamma)
+    OLS[[i]][[j]] <- lm(log10(F4mm) ~ log10(DSmm), data = MOR[MOR$Morph == morphs[j],])
+  } 
+}
+
+allometricpattern <- function(ols) {
+  ifelse(confint.default(ols[[j]])[2,1] < 1 & confint.default(ols[[j]])[2,2] < 1, # if both slope_2.5 and slope_97.5 < 1
+       "Hypoallometry",
+       ifelse(confint.default(ols[[j]])[2,1] < 1 & confint.default(ols[[j]])[2,2] > 1,
+              "Isometry", # if slope_2.5 < 1 and slope_97.5 > 1
+              "Hyperallometry")) # if both slope_2.5 and slope_97.5 > 1
+}
+
+COMPOLS <- list()
+
+for (j in seq_along(morphs)) {
+  
+  COMPOLS[[j]] <- data.frame(
+    Intercept = c(OLS[[1]][[j]]$coefficients[1],
+                  OLS[[2]][[j]]$coefficients[1],
+                  OLS[[3]][[j]]$coefficients[1],
+                  OLS[[4]][[j]]$coefficients[1]),
+    Int_2.5 = c(confint.default(OLS[[1]][[j]])[1,1],
+                confint.default(OLS[[2]][[j]])[1,1],
+                confint.default(OLS[[3]][[j]])[1,1],
+                confint.default(OLS[[4]][[j]])[1,1]),
+    Int_97.5 = c(confint.default(OLS[[1]][[j]])[1,2],
+                 confint.default(OLS[[2]][[j]])[1,2],
+                 confint.default(OLS[[3]][[j]])[1,2],
+                 confint.default(OLS[[4]][[j]])[1,2]),
+    Slope = c(OLS[[1]][[j]]$coefficients[2],
+              OLS[[2]][[j]]$coefficients[2],
+              OLS[[3]][[j]]$coefficients[2],
+              OLS[[4]][[j]]$coefficients[2]),
+    Slope_2.5 = c(confint.default(OLS[[1]][[j]])[2,1],
+                  confint.default(OLS[[2]][[j]])[2,1],
+                  confint.default(OLS[[3]][[j]])[2,1],
+                  confint.default(OLS[[4]][[j]])[2,1]),
+    Slope_97.5 = c(confint.default(OLS[[1]][[j]])[2,2],
+                   confint.default(OLS[[2]][[j]])[2,2],
+                   confint.default(OLS[[3]][[j]])[2,2],
+                   confint.default(OLS[[4]][[j]])[2,2]),
+    Pattern = c(allometricpattern(OLS[[1]]),
+                allometricpattern(OLS[[2]]),
+                allometricpattern(OLS[[3]]),
+                allometricpattern(OLS[[4]]))
+  )
+  
+  rownames(COMPOLS[[j]]) <- thres
+  COMPOLS[[j]][,1:6] <- round(COMPOLS[[j]][,1:6],2)
+}
+
+names(COMPOLS) <- morphs
+```
+
+```{r include=FALSE}
+rm(i,j,thres,MOR)
+```
+
+### Alpha allometry
+
+```{r alpha OLS, echo=FALSE}
+COMPOLS$Alpha
+```
+
+### Beta allometry
+
+```{r beta OLS, echo=FALSE}
+COMPOLS$Beta
+```
+
+### Gamma allometry
+
+```{r gamma OLS, echo=FALSE}
+COMPOLS$Gamma
+```
+
+```{r plots1, echo=FALSE}
+range_alpha <- range(MALES$DSmm[MALES$T80 == "Alpha"], na.rm = TRUE)
+range_beta  <- range(MALES$DSmm[MALES$T80 == "Beta"], na.rm = TRUE)
+range_gamma <- range(MALES$DSmm[MALES$T80 == "Gamma"], na.rm = TRUE)
+
+cores <- viridis(7)
+
+# Measurements per morph as defined by the 80% threshold
+p1 <- ggplot(MALES, aes(x = DSmm, y = F4mm, color = T80)) +
+  geom_point(size = 4, alpha = 0.7) +
+  scale_color_manual(values = c("grey", cores[c(2,4,6)])) +
+  
+  # Linha Alpha
+  geom_function(
+    fun = function(x) 10^(COMPOLS$Alpha$Intercept[1] + COMPOLS$Alpha$Slope[1] * log10(x)),
+    color = "black",
+    linewidth = 1,
+    args = list(),
+    xlim = range_alpha
+  ) +
+  
+  # Linha Beta
+  geom_function(
+    fun = function(x) 10^(COMPOLS$Beta$Intercept[1] + COMPOLS$Beta$Slope[1] * log10(x)),
+    color = "black",
+    linewidth = 1,
+    xlim = range_beta
+  ) +
+  
+  # Linha Gamma
+  geom_function(
+    fun = function(x) 10^(COMPOLS$Gamma$Intercept[1] + COMPOLS$Gamma$Slope[1] * log10(x)),
+    color = "black",
+    linewidth = 1,
+    xlim = range_gamma
+  ) +
+  
+  labs(x = "Dorsal scute length (mm)",
+       y = "Femur IV length (mm)") +
+  theme_classic() +
+  theme(
+    legend.title = element_blank(),
+    legend.text = element_text(size = 12)
+  )
+```
+
+```{r plots1 legend, echo=FALSE}
+#| label: fig-morph
+#| fig-cap: "Allometric relationship between femur IV length and dorsal scute length (body size), with male morphs assigned using a bivariate mixture model. Gray points represent individuals with less than 80% confidence in morph assignment; these were excluded from the regression analyses. Black lines show ordinary least squares regressions fitted on log10-transformed variables and back-transformed to the original scale."
+#| fig-alt: "Scatterplot of male morphometric measurements showing femur IV length versus dorsal scute length. Point colors indicate morph identity based on the 80% assignment threshold: alphas at larger sizes, betas at intermediate values, and gammas at smaller sizes, with some overlap among groups. Gray points represent individuals with uncertain assignment."
+p1
+```
+
+## Model diagnostics
+
+We evaluated model diagnostics using the 80% threshold for morph determination.
+
+### Alpha
+
+For alpha males, the model is statistically valid, and the relationship between leg IV and body size is significant and hypoallometric (slope = 0.43, CI = 0.17-0.69, p = 0.001). However, dorsal scute length explains only a small fraction of the variation in leg IV length (R² = 0.05), indicating low predictive power of body size for leg size.
+
+```{r alpha diag, echo=FALSE}
+a <- OLS[[1]][[1]]
+plot(simulateResiduals(a))
+summary(a)
+confint(a)
+```
+
+### Beta
+
+For beta males, the relationship between leg IV and body size is significant and clearly hyperallometric (slope = 1.99, 95% CI = 1.66–2.33, p < 2e-16), with a substantial fraction of variance in leg IV explained by body size (R² = 0.31). Model diagnostics indicate a slight deviation in the lower quantile of the residual distribution, suggesting mild heterogeneity at low F4mm values. As the other diagnostics are satisfactory, this deviation is unlikely to compromise model interpretation.
+
+```{r beta diag, echo=FALSE}
+b <- OLS[[1]][[2]]
+plot(simulateResiduals(b))
+summary(b)
+confint(b)
+```
+
+### Gamma
+
+For gamma males, the relationship between body size and leg IV length is positive and significant, but the slope does not differ from isometry (slope = 0.81, 95% CI = 0.21–1.41, p = 0.009). Similar to alphas, only a small fraction of the variation in leg length is explained by body size (R² = 0.1).
+
+*Note: A warning appeared during residual simulation (`Fitting terminated with step failure`), but all other DHARMa diagnostics (uniformity, dispersion, outliers) indicate that model assumptions are met, suggesting that the warning reflects a minor numerical issue rather than a problem with the fit.*
+
+```{r gamma diag, echo=FALSE}
+g <- OLS[[1]][[3]]
+plot(simulateResiduals(g))
+summary(g)
+confint(g)
+```
+
+# Assessment of normality of morphological traits
+
+We assessed the normality of femur IV length and dorsal scute length for each male morph using the Shapiro-Wilk test. 
+
+Femur IV length deviated from normality in alpha and beta males (p < 0.001), whereas gamma males did not show evidence of departure from normality (p = 0.574). Dorsal scute length was approximately normal for all morphs (p > 0.05). 
+
+### Femur IV
+
+#### Alpha
+
+```{r alpha femur shapiro, echo=FALSE}
+shapiro.test(MALES$F4mm[MALES$T80 == "Alpha"])
+```
+
+#### Beta
+
+```{r beta femur shapiro, echo=FALSE}
+shapiro.test(MALES$F4mm[MALES$T80 == "Beta"])
+```
+
+#### Gamma
+```{r gamma femur shapiro, echo=FALSE}
+shapiro.test(MALES$F4mm[MALES$T80 == "Gamma"])
+```
+
+### Dorsal scute length
+
+#### Alpha
+
+```{r alpha scute shapiro, echo=FALSE}
+shapiro.test(MALES$DSmm[MALES$T80 == "Alpha"])
+```
+
+#### Beta
+
+```{r beta scute shapiro, echo=FALSE}
+shapiro.test(MALES$DSmm[MALES$T80 == "Beta"])
+```
+
+#### Gamma
+
+```{r gamma scute shapiro, echo=FALSE}
+shapiro.test(MALES$DSmm[MALES$T80 == "Gamma"])
+```
+
+# Bootstrap resampling to estimate variability
+
+Because femur IV length was not normally distributed in all groups, we avoided relying on z-scores for standardization and instead quantified within-morph size variability using bootstrap resampling with the `boot` package [@cantyripley2024].
+
+For each morph, we used the adjusted bootstrap percentile method to estimate 95% confidence intervals for the standard deviation of both femur IV and dorsal scute lengths.
+
+```{r create boot functions, echo=FALSE}
+mean_stat <- function(data, indices) {
+  x <- data[indices]
+  return(mean(x))
+}
+
+sd_stat <- function(data, indices) {
+  x <- data[indices]
+  return(sd(x))
+}
+
+diff_CI <- function(boot1, boot2, conf_level = 0.95) {
+  diffs <- boot1$t - boot2$t
+  alpha <- 1 - conf_level
+  CI <- quantile(diffs, probs = c(alpha/2, 1 - alpha/2))
+  return(CI)
+}
+```
+
+## Femur IV
+
+```{r femur boot prep, echo=FALSE}
+mean_f4_boot <- list()
+CImean_f4_boot <- list()
+sd_f4_boot <- list()
+CIsd_f4_boot <- list()
+```
+
+```{r femur boot variability loop, echo=FALSE}
+set.seed(42)
+
+for (i in seq_along(morphs)) {
+  MOR <- MALES[MALES$T80 == morphs[i], ]
+  
+  # Bootstrap for mean
+  mean_f4_boot[[i]] <- boot(data = MOR$F4mm, statistic = mean_stat, R = 10000)
+  CImean_f4_boot[[i]] <- boot.ci(mean_f4_boot[[i]], type = c("perc", "bca"))
+  
+  # Bootstrap for SD
+  sd_f4_boot[[i]] <- boot(data = MOR$F4mm, statistic = sd_stat, R = 10000)
+  CIsd_f4_boot[[i]] <- boot.ci(sd_f4_boot[[i]], type = c("perc", "bca"))
+  
+  # # Print results
+  # cat("\n\n\n--- Morph:", morphs[i], "---")
+  # cat("\n\nMean femur IV length (bootstrap):\n")
+  # print(mean_f4_boot[[i]])
+  # cat("\n95% CI for mean:\n")
+  # print(CImean_f4_boot[[i]])
+  # 
+  # cat("\n\nStandard deviation of femur IV length (bootstrap):\n")
+  # print(sd_f4_boot[[i]])
+  # cat("\n95% CI for SD:\n")
+  # print(CIsd_f4_boot[[i]])
+}
+```
+
+### Alpha
+
+#### Mean femur IV length (bootstrap)
+
+```{r alpha femur boot, echo=FALSE}
+mean_f4_boot[[1]]
+```
+
+##### 95% CI (mean)
+
+```{r alpha femur boot ci, echo=FALSE}
+CImean_f4_boot[[1]]
+```
+
+#### Standard deviation of femur IV length (bootstrap)
+
+```{r alpha femur boot sd, echo=FALSE}
+sd_f4_boot[[1]]
+```
+
+##### 95% CI (sd)
+
+```{r alpha femur boot sd ci, echo=FALSE}
+CIsd_f4_boot[[1]]
+```
+
+### Beta
+
+#### Mean femur IV length (bootstrap)
+
+```{r beta femur boot, echo=FALSE}
+mean_f4_boot[[2]]
+```
+
+##### 95% CI (mean)
+
+```{r beta femur boot ci, echo=FALSE}
+CImean_f4_boot[[2]]
+```
+
+#### Standard deviation of femur IV length (bootstrap)
+
+```{r beta femur boot sd, echo=FALSE}
+sd_f4_boot[[2]]
+```
+
+##### 95% CI (sd)
+
+```{r beta femur boot sd ci, echo=FALSE}
+CIsd_f4_boot[[2]]
+```
+
+### Gamma
+
+#### Mean femur IV length (bootstrap)
+
+```{r gamma femur boot, echo=FALSE}
+mean_f4_boot[[3]]
+```
+
+##### 95% CI (mean)
+
+```{r gamma femur boot ci, echo=FALSE}
+CImean_f4_boot[[3]]
+```
+
+#### Standard deviation of femur IV length (bootstrap)
+
+```{r gamma femur boot sd, echo=FALSE}
+sd_f4_boot[[3]]
+```
+
+##### 95% CI (sd)
+
+```{r gamma femur boot sd ci, echo=FALSE}
+CIsd_f4_boot[[3]]
+```
+
+## Dorsal scute
+
+```{r scute boot prep, echo=FALSE}
+mean_ds_boot <- list()
+CImean_ds_boot <- list()
+sd_ds_boot <- list()
+CIsd_ds_boot <- list()
+```
+
+```{r scute boot variability loop, echo=FALSE}
+set.seed(42)
+
+for (i in seq_along(morphs)) {
+  MOR <- MALES[MALES$T80 == morphs[i], ]
+  
+  # Bootstrap for mean
+  mean_ds_boot[[i]] <- boot(data = MOR$DSmm, statistic = mean_stat, R = 10000)
+  CImean_ds_boot[[i]] <- boot.ci(mean_ds_boot[[i]], type = c("perc", "bca"))
+  
+  # Bootstrap for SD
+  sd_ds_boot[[i]] <- boot(data = MOR$DSmm, statistic = sd_stat, R = 10000)
+  CIsd_ds_boot[[i]] <- boot.ci(sd_ds_boot[[i]], type = c("perc", "bca"))
+  
+  # # Print results
+  # cat("\n\n\n--- Morph:", morphs[i], "---")
+  # cat("\n\nMean dorsal scute length (bootstrap):\n")
+  # print(mean_ds_boot[[i]])
+  # cat("\n95% CI for mean:\n")
+  # print(CImean_ds_boot[[i]])
+  # 
+  # cat("\n\nStandard deviation of dorsal scute length (bootstrap):\n")
+  # print(sd_ds_boot[[i]])
+  # cat("\n95% CI for SD:\n")
+  # print(CIsd_ds_boot[[i]])
+}
+```
+
+### Alpha
+
+#### Mean dorsal scute length (bootstrap)
+
+```{r alpha scute boot, echo=FALSE}
+mean_ds_boot[[1]]
+```
+
+##### 95% CI (mean)
+
+```{r alpha scute boot ci, echo=FALSE}
+CImean_ds_boot[[1]]
+```
+
+#### Standard deviation of dorsal scute length (bootstrap)
+
+```{r alpha scute boot sd, echo=FALSE}
+sd_ds_boot[[1]]
+```
+
+##### 95% CI (sd)
+
+```{r alpha scute boot sd ci, echo=FALSE}
+CIsd_ds_boot[[1]]
+```
+
+### Beta
+
+#### Mean dorsal scute length (bootstrap)
+
+```{r beta scute boot, echo=FALSE}
+mean_ds_boot[[2]]
+```
+
+##### 95% CI (mean)
+
+```{r beta scute boot ci, echo=FALSE}
+CImean_ds_boot[[2]]
+```
+
+#### Standard deviation of dorsal scute length (bootstrap)
+
+```{r beta scute boot sd, echo=FALSE}
+sd_ds_boot[[2]]
+```
+
+##### 95% CI (sd)
+
+```{r beta scute boot sd ci, echo=FALSE}
+CIsd_ds_boot[[2]]
+```
+
+### Gamma
+
+#### Mean dorsal scute length (bootstrap)
+
+```{r gamma scute boot, echo=FALSE}
+mean_ds_boot[[3]]
+```
+
+##### 95% CI (mean)
+
+```{r gamma scute boot ci, echo=FALSE}
+CImean_ds_boot[[3]]
+```
+
+#### Standard deviation of dorsal scute length (bootstrap)
+
+```{r gamma scute boot sd, echo=FALSE}
+sd_ds_boot[[3]]
+```
+
+##### 95% CI (sd)
+
+```{r gamma scute boot sd ci, echo=FALSE}
+CIsd_ds_boot[[3]]
+```
+
+# Pairwise differences
+
+To assess whether variability differed among morphs, we calculated all pairwise differences between the bootstrap distributions of standard deviations and derived 95% confidence intervals for these differences. Differences were considered significant if their intervals did not include zero.
+
+## Femur IV length (bootstrap 95% CIs)
+
+```{r f4 diff ci, echo=FALSE}
+# Calculate and display 95% CIs for SD differences between morphs
+f4_diff_CIs <- list(
+  "Alpha vs Beta"  = diff_CI(sd_f4_boot[[1]], sd_f4_boot[[2]]),
+  "Alpha vs Gamma" = diff_CI(sd_f4_boot[[1]], sd_f4_boot[[3]]),
+  "Beta vs Gamma"  = diff_CI(sd_f4_boot[[2]], sd_f4_boot[[3]])
+)
+
+print(f4_diff_CIs)
+```
+
+## Dorsal scute length (bootstrap 95% CIs)
+
+```{r ds diff ci, echo=FALSE}
+# Calculate and display 95% CIs for SD differences between morphs
+ds_diff_CIs <- list(
+  "Alpha vs Beta"  = diff_CI(sd_ds_boot[[1]], sd_ds_boot[[2]]),
+  "Alpha vs Gamma" = diff_CI(sd_ds_boot[[1]], sd_ds_boot[[3]]),
+  "Beta vs Gamma"  = diff_CI(sd_ds_boot[[2]], sd_ds_boot[[3]])
+)
+
+print(ds_diff_CIs)
+```

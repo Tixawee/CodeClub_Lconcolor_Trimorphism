@@ -1,0 +1,179 @@
+---
+title: "03 - Behavioral data"
+subtitle: "03_behavioral_data.qmd"
+format: 
+  html:
+    embed-resources: true
+bibliography: ../referencias.bib
+eval: true
+warning: false
+knitr:
+  opts_chunk: 
+    message: false
+---
+
+# Overview
+
+Given the discovery of male trimorphism in *Longiperna concolor*, this document presents a reanalysis of the behavioral dataset collected by @zatz2011, now interpreted through the lens of the three male morphs. In particular, we revisit patterns of male–male fights and harem maintenance to assess how these behaviors align with the distinct tactics associated with alpha, beta, and gamma males.
+
+```{r load libraries, echo=FALSE}
+# Load libraries
+## Check if they are already installed
+library(here)
+```
+
+# Load data
+
+The `MALES` dataset—generated in `01_exploratory_analysis.qmd` and further refined in `02_morph_discrimination.qmd`—contains individual-level information (ID, sex, and morphological measurements) for all *L. concolor* males included in this study. It also provides both the original morph classifications proposed by @zatz2011 and the updated classifications obtained here using our trimodal bivariate mixture model, applying 80%, 85%, 90%, and 95% probability thresholds for morph assignment.
+
+```{r load MALES, echo=FALSE}
+MALES <- readRDS(file = here("data","processed_data","male_morph_data.rds"))
+str(MALES)
+```
+
+The `HF` dataset contains individual records, including male morph determinations from @zatz2011, a binary indicator of whether each male was observed holding a harem—defined by @zatz2011 as males whose modal recapture site coincided with a stable group of females and who were captured at least four times—and a binary indicator of whether the male was observed engaging in fights during the study.
+
+```{r load HF, echo=FALSE}
+HF <- readRDS(here("data","original_data","original_harem_fight.rds"))
+HF$Harem <- factor(HF$Harem, levels = c(1,0), labels = c("Harem","No harem"))
+HF$Fight <- factor(HF$Fight, levels = c(1,0), labels = c("Fight","No fight"))
+str(HF)
+```
+
+*Note: although `MALES` and `HF` include the same total number of males, their individual compositions are not identical. Some males present in `HF` are missing from `MALES`, and vice versa. This mismatch does not affect the inferences made here, however, because all analyses are based on the subset of males that either fought or were observed holding harems, rather than on the entire male population.*
+
+```{r check identities}
+identical(HF$ID,MALES$ID)
+
+# Males present in HF but not in MALES
+setdiff(HF$ID,MALES$ID)
+
+# Males present in MALES but not in HF
+setdiff(MALES$ID,HF$ID)
+```
+
+We can now incorporate the morph classification generated in our study into the `HF` dataset.
+
+```{r add morph data, echo=FALSE}
+HF$T80 <- MALES$T80[match(HF$ID,MALES$ID)]
+str(HF)
+```
+
+```{r save FIGHT, echo=FALSE}
+saveRDS(HF, here("data","processed_data","harem_fight.rds"))
+```
+
+
+# Harem holding males
+
+## Occurrence of harem holding
+
+During the study, a total of 180 males were classified as harem holders by @zatz2011 et al.
+
+```{r see harem 1, echo=FALSE}
+table(HF$Harem)
+```
+
+## Harem holding by morph (@zatz2011 classification)
+
+Of these, 89% were majors and 11% were minors. A Fisher’s exact test indicated a significant association between morph and harem-holding behavior (p = 0.037). Majors were approximately 77% more likely to possess harems than minors (OR = 1.77, 95% CI: 1.02–3.20).
+
+```{r see harem 2, echo=FALSE}
+round(prop.table(table(HF$MorphZatz[HF$Harem == "Harem"])),2)
+
+harem <- table(HF$MorphZatz,HF$Harem)
+harem
+
+fisher.test(harem)
+```
+
+## Harem holding by morph (this study's classification):
+
+According to our reclassification, among the males identified as harem holders, 46% were alphas, 38% were betas, 6% were gammas, and 11% were NIs. When the NI males are excluded, the Fisher’s exact test indicates a significant association between morph and harem-holding behavior.
+
+```{r see harem 3, echo=FALSE}
+round(prop.table(table(HF$T80[HF$Harem == "Harem"])),2)
+
+harem <- table(HF$T80,HF$Harem)
+harem
+
+harem <- harem[2:4,]
+fisher.test(harem)
+```
+
+### Odds of harem holding:
+
+When comparing morphs pairwise, alphas have 3.14 times higher odds of possessing a harem than betas, and 3.95 times higher odds than gammas. Betas, in turn, show 1.26 times higher odds than gammas, although this difference is not statistically significant.
+
+```{r harem odds, echo=FALSE}
+pairs <- combn(rownames(harem),2)
+
+calc_pair <- function(a,b,tab) {
+  pair <- tab[c(a,b),]
+  ft <- fisher.test(pair)
+  
+  data.frame(morph1 = a,
+             morph2 = b,
+             OR = round(unname(ft$estimate),2),
+             p_value = ft$p.value,
+             IC_low = round(ft$conf.int[1],2),
+             IC_high = round(ft$conf.int[2],2))
+}
+
+do.call(rbind,
+        apply(pairs,2,function(p) calc_pair(p[1],p[2],harem)))
+```
+
+# Contest engagement
+
+## Occurrence of territorial contests
+
+During the study, only 13 fights were directly observed, reflecting how difficult these interactions are to witness in the field. Across these 13 fights, a total of 19 males were involved, indicating that some individuals were observed fighting more than once.
+
+```{r see fights 1, echo=FALSE}
+table(HF$Fight)
+```
+
+## Contest engagement by morph (@zatz2011 classification)
+
+Of the 19 males that engaged in fights, all were classified as majors according to @zatz2011.
+
+```{r see fights 2, echo=FALSE}
+table(HF$MorphZatz,HF$Fight)
+```
+
+## Contest engagement by morph (this study's classification)
+
+With our reassessment, 9 males were identified as alphas, 3 as betas, and 7 as NI. No gamma males were observed engaging in fights.
+
+```{r see fights 3, echo=FALSE}
+fight <- table(HF$T80,HF$Fight)
+fight
+
+round(prop.table(table(HF$T80[HF$Fight == "Fight"])),2)
+```
+
+*Note: All NI males observed engaging in fights had leg lengths greater than the mean leg length of beta males, placing them morphologically between alphas and betas. No small NI males were ever observed fighting. The range of femur IV lengths for those NI males is shown below (in mm):*
+
+```{r see NIs, echo=FALSE}
+NIs <- HF[HF$T80 == "NI" & HF$Fight == "Fight",]
+
+range(MALES$F4mm[match(NIs$ID,MALES$ID)])
+```
+
+Despite the low number of observed fights—which naturally limits the strength of our inferences—the Fisher’s exact test still indicates an association between morph and fighting behavior.
+
+```{r see fights 4, echo=FALSE}
+fight <- fight[2:4,]
+
+fisher.test(fight)
+```
+
+### Odds of fighting
+
+Given the small number of observed fights, pairwise comparisons provide only limited inference. Although alphas appear more likely to engage in fights than betas (OR = 5.5, 95% CI: 1.35–32.03), the confidence interval is extremely wide, reflecting high uncertainty. Comparisons involving gamma males yield infinite odds ratios and uninformative confidence intervals, simply because no gamma males were ever observed fighting. Therefore, these pairwise contrasts should be interpreted with caution, as the low sample size restricts the reliability of the estimated effect sizes.
+
+```{r fighting odds, echo=FALSE}
+do.call(rbind,
+        apply(pairs,2,function(p) calc_pair(p[1],p[2],fight)))
+```

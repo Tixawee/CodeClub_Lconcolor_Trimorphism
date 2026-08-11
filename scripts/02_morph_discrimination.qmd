@@ -1,0 +1,422 @@
+---
+title: "02 - Male morph discrimination"
+subtitle: "02_morph_discrimination.qmd"
+format: 
+  html:
+    embed-resources: true
+bibliography: ../referencias.bib
+eval: true
+warning: false
+knitr:
+  opts_chunk: 
+    message: false
+---
+
+# Overview
+
+This document outlines the investigation into the potential existence of male trimorphism in *Longiperna concolor* and details the procedures used for male morph discrimination.
+
+```{r load libraries, echo=FALSE}
+# Load libraries
+## Check if they are already installed
+library(here)
+library(mixsmsn)
+library(tidyverse)
+library(ggplot2)
+library(ggalluvial)
+library(viridis)
+library(patchwork)
+```
+
+# Load data
+
+The `MALES` dataset, generated using the `01_exploratory_analysis.qmd` file, contains individual-level information--such as ID, sex, and body measurements--for all *L. concolor* males analyzed in this study. It also includes the morph classifications established by @zatz2011.
+
+```{r load MALES, echo=FALSE}
+MALES <- readRDS(file = here("data","processed_data","male_data.rds"))
+str(MALES)
+```
+
+# Classifying male morphs with mixture models
+
+## Univariate models
+
+Here, we adopt the common procedure of establishing polymorphism through univariate mixture models, fitted solely to fourth femur length (i.e., the threat device) using the `mixsmsn` package [@prates2013]. We then compare models comprising mixtures of one, two and three skewed normal distributions.
+
+```{r include=FALSE}
+set.seed(42)
+```
+
+*Note: As stated by @prates2013 in the package description, the* `nu` *parameter is ignored in finite mixture skewed normal models and, therefore, its value is irrelevant.*
+
+```{r univariate finite mixture models}
+# Univariate unimodal
+SN.Mix1 <- smsn.mix(y = na.omit(MALES$F4mm), # response vector 
+                    g = 1, # number of cluster to be considered in fitting 
+                    nu = 5, # parameter of the scale variable (vector or scalar) of the SMSN family (kurtosis parameter) 
+                    family = "Skew.normal") # distribution family to be used in fitting
+
+# Univariate bimodal
+SN.Mix2 <- smsn.mix(y = na.omit(MALES$F4mm), 
+                    g = 2, 
+                    nu = 5, 
+                    obs.prob = TRUE, # reports the posterior probability of each observation belonging to one of the g groups 
+                    family = "Skew.normal") 
+
+# Univariate trimodal
+SN.Mix3 <- smsn.mix(y = na.omit(MALES$F4mm),
+                    g = 3,
+                    nu = 5,
+                    obs.prob = TRUE,
+                    family = "Skew.normal")
+```
+
+```{r AIC univariate models, echo=FALSE}
+AICs <- c(SN.Mix1$aic,SN.Mix2$aic,SN.Mix3$aic)
+  
+mxAICs <- matrix(NA,nrow = length(AICs),ncol = length(AICs))
+
+for (i in 1:length(AICs)) {
+  for (j in 1:length(AICs)) {
+    mxAICs[i,j] <- AICs[i]-AICs[j]
+  }
+}
+
+# delta AIC
+unibi <- mxAICs[1,2]
+unitri <- mxAICs[1,3]
+bitri <- mxAICs[2,3]
+
+# Define the distribution type (unimodal, bimodal or trimodal), where it is considered of a given distribution only if deltaAIC > 0 and the absolute difference of AICs is >= 2.
+type <- ifelse(min(AICs) == AICs[2] && abs(unibi) >= 2 && abs(bitri) >= 2, "bimodal", 
+               ifelse(min(AICs) == AICs[1] && abs(unibi) >= 2 && abs(unitri) >= 2, "unimodal", 
+                      ifelse(min(AICs) == AICs[3] && abs(unitri) >= 2 && abs(bitri) >= 2, "trimodal", "not clear")))
+  
+# create AIC table
+AICtable <- data.frame(uni = round(AICs[1],2), 
+                       bi = round(AICs[2],2), 
+                       tri = round(AICs[3],2), 
+                       unibi = round(abs(unibi),2), 
+                       unitri = round(abs(unitri),2), 
+                       bitri = round(abs(bitri),2), 
+                       type = type)
+```
+
+As we can see, according to the Akaike Information Criterion (AIC), male fourth femur length is best described as trimodal, but with a 𝛥AIC slightly above 2.
+
+```{r univariate AICtable, echo=FALSE}
+AICtable
+```
+
+```{r include=FALSE}
+rm(i,j,mxAICs,bitri,unibi,unitri,type,AICs,AICtable)
+```
+
+Below, we show both the bimodal and trimodal density curves plotted over the fourth femur length histogram:
+
+```{r echo=FALSE}
+# Calculate mixture density of a skew-normal mixture model
+
+# This custom function was written to provide more flexibility for plotting,
+# since the `mix.hist` function in the 'mixsmsn' package is limited in terms
+# of graphical customization. The computed result is equivalent to `mix.hist`.
+
+# The function computes the overall density of a finite mixture of skew-normal
+# components over a given sequence of x values, based on the fitted model.
+calc_mix_density <- function(model, x_seq) {
+  # Extract mixture parameters
+  weights   <- model$pii      # Mixing proportions
+  locations <- model$mu       # Means
+  variances <- model$sigma2   # Variances
+  shapes    <- model$shape    # Skewness parameters
+  
+  # Single-component case
+  if (length(weights) == 1) {
+    dens <- weights * (2 * dnorm(x_seq, mean = locations, sd = sqrt(variances))
+                       * pnorm(shapes * ((x_seq - locations) / sqrt(variances))))
+  } else {
+    # Multi-component case: weighted sum of component densities
+    comp_densities <- sapply(seq_along(weights), function(j) {
+      dens_j <- 2 * dnorm(x_seq, mean = locations[j], sd = sqrt(variances[j])) *
+        pnorm(shapes[j] * ((x_seq - locations[j]) / sqrt(variances[j])))
+      weights[j] * dens_j
+    })
+    dens <- rowSums(comp_densities)
+  }
+  
+  return(dens)
+}
+
+x_seq <- seq(15, 60, length.out = 500)
+
+dens2 <- calc_mix_density(SN.Mix2, x_seq = x_seq)
+dens3 <- calc_mix_density(SN.Mix3, x_seq = x_seq)
+```
+
+```{r echo=FALSE}
+#| label: fig-f4-mixsmsn
+#| fig-cap: "Frequency histogram for femur IV length in the harvestman *Longiperna concolor*. The solid line represents the best-fitting univariate distribution, with three male morphs, while the dashed line represents the univariate distribution with two male morphs."
+#| fig-alt: "Histogram of femur IV length in *Longiperna concolor*, with a solid line showing the best-fitting distribution for three male morphs and a dashed line for two morphs."
+
+par(las = 1, cex.axis = 1.2, cex.lab = 1.5, mar = c(5.5, 6, 1, 2), mgp = c(4, 1, 0))
+
+hist(MALES$F4mm, 
+     breaks = 40,                  # Number of bins
+     xlim = c(15, 60),             # x-axis range
+     ylim = c(0, 0.05),            # y-axis range
+     freq = FALSE,                 # Plot density instead of count
+     main = "",                    # No title
+     xlab = "Femur IV length (mm)",
+     ylab = "Density",
+     col = "lightgrey", 
+     border = "black")
+
+lines(x_seq, dens2, col = "black", lwd = 2, lty = 2)  # Dashed line for 2-component model
+lines(x_seq, dens3, col = "black", lwd = 2)           # Solid line for 3-component model
+
+axis(1, at = seq(15, 60, by = 5), labels = seq(15, 60, by = 5))
+```
+
+## Bivariate models
+
+To further assess the trimodality suggested above, we explored providing additional information to the mixture model by also including dorsal scute length. Since dorsal scute length is unimodal, if it were equally distributed across morphs we would expect results similar to those from the univarite model. Conversely, if males were clustered into groups defined jointly by body and leg size, we would expect the trimodal model to have the lowest AIC, with a larger 𝛥AIC separating it from the competing models.
+
+```{r include=FALSE}
+set.seed(42)
+```
+
+```{r bivariate finite mixture models}
+multimod1 <- smsn.mmix(cbind(MALES$F4mm,MALES$DSmm),
+                       nu = 5,
+                       g = 1,
+                       get.init = TRUE,
+                       family = "Skew.normal",
+                       group = TRUE)
+multimod2 <- smsn.mmix(cbind(MALES$F4mm,MALES$DSmm),
+                       nu = 5,
+                       g = 2,
+                       get.init = TRUE,
+                       family = "Skew.normal",
+                       obs.prob = TRUE,
+                       group = TRUE)
+multimod3 <- smsn.mmix(cbind(MALES$F4mm,MALES$DSmm),
+                       nu = 5,
+                       g = 3,
+                       get.init = TRUE,
+                       family = "Skew.normal",
+                       obs.prob = TRUE,
+                       group = TRUE)
+```
+
+```{r AIC bivariate models, echo=FALSE}
+MVAICs <- c(multimod1$aic,multimod2$aic,multimod3$aic)
+
+mxMVAICs <- matrix(NA,nrow = length(MVAICs),ncol = length(MVAICs))
+
+for (i in 1:length(MVAICs)) {
+  for (j in 1:length(MVAICs)) {
+    mxMVAICs[i,j] <- MVAICs[i]-MVAICs[j]
+  }
+}
+
+# delta AIC
+unibi <- mxMVAICs[1,2]
+unitri <- mxMVAICs[1,3]
+bitri <- mxMVAICs[2,3]
+
+type <- ifelse(min(mxMVAICs) == mxMVAICs[2] && abs(unibi) >= 2 && abs(bitri) >= 2, "bimodal", 
+               ifelse(min(mxMVAICs) == mxMVAICs[1] && abs(unibi) >= 2 && abs(unitri) >= 2, "unimodal", 
+                      ifelse(min(mxMVAICs) == mxMVAICs[3] && abs(unitri) >= 2 && abs(bitri) >= 2, "trimodal", "not clear")))
+
+MVICtable <- data.frame(uni = round(MVAICs[1],2),
+                        bi = round(MVAICs[2],2),
+                        tri = round(MVAICs[3],2),
+                        unibi = round(abs(unibi),2),
+                        unitri = round(abs(unitri),2), 
+                        bitri = round(abs(bitri),2), 
+                        type = type)
+```
+
+When incorporating dorsal scute length, AIC values consistently support trimodality, with larger 𝛥AIC values compared to the univariate analysis. This indicates that the trimodal distribution is not only more adequate, but also that dorsal scute length contributes substantially to the clustering structure and should therefore be considered in further analyses. We therefore adopted the trimodal bivariate model for male morph discrimination.
+
+```{r bivariate AICtable, echo=FALSE}
+MVICtable
+```
+
+```{r include=FALSE}
+rm(i,j,mxMVAICs,bitri,unibi,unitri,type,MVAICs,MVICtable)
+```
+
+## Final morph discrimination
+
+Given the substantial overlap between morphs and in order to balance classification certainty with retaining as many individuals as possible, we adopted a 80% membership threshold. Because this threshold is somewhat arbitrary, we performed a simple sensitivity analysis to assess how varying the threshold affects the number of individuals classified and subsequent allometry analyses.
+
+```{r threshold sensitivity analysis prep, include=FALSE}
+MCT <- data.frame(Confidence = c(.80,.85,.90,.95),
+                  Alpha = NA,
+                  Beta = NA,
+                  Gamma = NA,
+                  NI = NA)
+
+CM <- data.frame(T80 = rep(NA,nrow(multimod3$obs.prob)),
+                 T85 = rep(NA,nrow(multimod3$obs.prob)),
+                 T90 = rep(NA,nrow(multimod3$obs.prob)),
+                 T95 = rep(NA,nrow(multimod3$obs.prob)))
+
+morphs <- rep(NA,nrow(multimod3$obs.prob))
+
+ord <- unlist(multimod3$mu)[seq(1,length(unlist(multimod3$mu)), by = 2)]
+
+# table of membership probabilities, with individuals in rows and groups in columns
+MORPHPROB <- as.data.frame(multimod3$obs.prob)
+
+colnames(MORPHPROB)[which(ord == max(ord))] <- "Alpha"
+colnames(MORPHPROB)[which(ord != max(ord) & ord != min(ord))] <- "Beta"
+colnames(MORPHPROB)[which(ord == min(ord))] <- "Gamma"
+```
+
+As expected, raising the membership probability threshold increases the number of non-identified individuals (NI).
+
+```{r threshold sensitivity analysis 1, echo=FALSE}
+for (m in 1:length(unique(MCT$Confidence))) {
+  # determine the morphs with probabilities >= MCT$Confidence
+  for (i in 1:nrow(multimod3$obs.prob)) { 
+    probs <- MORPHPROB[i,] 
+    
+    if (length(which(probs >= MCT$Confidence[m])) == 0) {
+      morphs[i] <- 0 # NI  
+    } else { 
+      morphs[i] <- which(probs >= MCT$Confidence[m])  
+    } 
+    
+  }
+ 
+  MCT$NI[m] <- table(morphs)[1]
+  MCT$Alpha[m] <- table(morphs)[2] 
+  MCT$Beta[m] <- table(morphs)[3]
+  MCT$Gamma[m] <- table(morphs)[4]
+  
+  CM[,m] <- morphs
+}
+
+MCT
+```
+
+However, relative morph frequencies remains mostly stable. 
+
+```{r threshold sensitivity analysis 2, echo=FALSE}
+MCTprop <- MCT
+
+for(i in 1:nrow(MCTprop)) {
+  MCTprop[i,2:ncol(MCTprop)] <- MCTprop[i,2:ncol(MCTprop)]/sum(MCTprop[i,2:ncol(MCTprop)])
+}
+
+round(MCTprop,2)
+```
+
+`MALES` is now a dataset that also includes male morphs classified using the bivariate trimodal mixture model, with membership thresholds of 80%, 85%, 90%, and 95%.
+
+```{r save male data, echo=FALSE}
+CM <- CM %>%
+  mutate(across(everything(), ~factor(.x, levels = c(0,1,2,3), labels = c("NI","Alpha","Beta","Gamma"))))
+
+MALES <- cbind(MALES,CM)
+
+str(MALES)
+
+saveRDS(MALES, file = here("data","processed_data","male_morph_data.rds"))
+```
+
+`MORPHPROB`is a dataframe containing the membership probabilities estimated by the same trimodal bivariate model, with individuals listed in the same order as in `MALES`.
+```{r save morph probabilities data, echo=FALSE}
+str(MORPHPROB)
+
+saveRDS(MORPHPROB, file = here("data","processed_data","membership_probability_data.rds"))
+```
+
+Number of large and small non-identified individuals.
+
+```{r NIs, include=FALSE}
+# Small NI
+smallNI <- MALES[MALES$T80 == "NI" & MALES$F4mm < mean(MALES$F4mm[MALES$T80 == "Beta"]),]
+
+# Large NI
+largeNI <- MALES[MALES$T80 == "NI" & MALES$F4mm > mean(MALES$F4mm[MALES$T80 == "Beta"]),]
+```
+
+```{r NItable, echo=FALSE}
+data.frame(Type = c("Large","Small"),
+           N = c(nrow(largeNI),nrow(smallNI)),
+           "F4mm (mean ± sd)" = c(paste0(round(mean(largeNI$F4mm),2)," ","±"," ",round(sd(largeNI$F4mm),2)),
+                    paste0(round(mean(smallNI$F4mm),2)," ","±"," ",round(sd(smallNI$F4mm),2))),
+           check.names = FALSE)
+```
+
+# Reassessment of morph classification
+
+In the plots below, we show the distribution of morphs identified in our study based on their morphological traits (Fig. 2a), as well as the correspondence between the classifications proposed by @zatz2011 and those obtained here (Fig. 2b). Compared with the original morph classification by @zatz2011, most majors are now reassigned to either alphas or betas, while nearly all minors fall into the gamma or non-identified categories.
+
+```{r plots1, echo=FALSE}
+cores <- viridis(7)
+
+# Measurements per morph as defined by the 80% threshold
+p1 <- ggplot(MALES, aes(x = DSmm, y = F4mm, color = T80)) +
+  geom_point(size = 4, alpha = 0.7) +
+  scale_color_manual(values = c("grey",cores[c(2,4,6)])) +
+  labs(x = "Dorsal scute length (mm)",
+       y = "Femur IV length (mm)") +
+  theme_classic() +
+  theme(
+    legend.title = element_blank(),
+    legend.text = element_text(size = 12)
+  ) +
+  annotate("text", x = Inf, y = Inf, label = "A", hjust = 1.2, vjust = 1.5, size = 6, fontface = "bold")
+
+p2 <- ggplot(MALES,
+             aes(axis1 = MorphZatz, axis2 = T80)) +
+  geom_alluvium(fill = "grey", alpha = 0.5) +
+  geom_stratum(aes(fill = after_stat(stratum)), alpha = 0.7) +
+  geom_text(stat = "stratum", aes(label = after_stat(stratum))) +
+  scale_fill_manual(
+    values = c(
+      "Major" = cores[3],
+      "Minor" = cores[5],
+      "NI"    = "lightgrey",
+      "Alpha" = cores[2],
+      "Beta"  = cores[4],
+      "Gamma" = cores[6]
+    )
+  ) +
+  
+  scale_x_discrete(limits = c("Old classification", "New classification")) +
+  labs(x = NULL, y = "Number of individuals") +
+  theme_classic() +
+  theme(
+    legend.position = "none",
+    axis.text.x = element_text(size = 12)
+    # ,
+    # axis.text.y = element_text(size = 14),
+    # axis.title.y = element_text(size = 14)
+  ) +
+  annotate("text", x = Inf, y = Inf, label = "B", hjust = 1.2, vjust = 1.5, size = 6, fontface = "bold")
+```
+
+```{r plots1 legend, echo=FALSE}
+#| label: fig-morphchange
+#| fig-cap: "(A) Relationship between femur IV length and dorsal scute length in males, with colors indicating morphs defined by the 80% threshold. (B) Alluvial diagram illustrating the correspondence between morph classifications proposed by @zatz2011 and those obtained under the 80% threshold criterion."
+#| fig-alt: "Panel A displays a scatterplot of male morphometric data, plotting femur IV length against dorsal scute length, with point colors representing morph identity based on the 80% threshold. Alphas occupy the upper region of the plot, betas cluster at intermediate values, and gammas appear at smaller sizes, with some overlap among groups. Panel B shows an alluvial diagram depicting how individuals transition from the morph categories of Zatz (2011) to the updated categories; minors predominantly shift to gamma or non-identified, while majors split between alpha and beta."
+#| fig-height: 6
+#| fig-width: 12
+
+p1 | p2
+```
+
+In terms of absolute and relative numbers, the cross-classification between the morph categories of @zatz2011 and those obtained under the 80% threshold is shown below:
+
+```{r echo=FALSE}
+tab <- table(MALES$MorphZatz, MALES$T80)
+tab
+
+round(prop.table(tab, margin = 1),2)
+```
+

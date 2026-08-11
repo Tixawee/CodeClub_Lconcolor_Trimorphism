@@ -1,0 +1,149 @@
+---
+title: "01 - Exploratory data analysis"
+subtitle: "01_exploratory_analysis.qmd"
+format: 
+  html:
+    embed-resources: true
+bibliography: ../referencias.bib
+eval: true
+warning: false
+knitr:
+  opts_chunk: 
+    message: false
+---
+
+# Overview
+
+This document presents the exploratory data analysis that guided our investigation into the potential existence of trimorphism in *Longiperna concolor*.
+
+```{r load libraries, echo=FALSE}
+# Load libraries
+## Check if they are already installed
+library(here)
+library(tidyverse)
+library(ggplot2)
+library(viridis)
+library(patchwork)
+```
+
+# Load data
+
+All data used in this study were collected during a mark-recapture survey conducted between October 2008 and April 2009 by @zatz2011.
+
+The `MALES` dataset comprises individual-level information for nearly all *L. concolor* males marked during the study, including their unique ID and key body measurements: dorsal scute length (*DSmm*, in mm) and femur length of the fourth right leg (*F4mm*, in mm). The dataset also includes the morph classifications defined by @zatz2011.
+
+*Note: Our dataset is missing one individual compared to @zatz2011. Additionally, we chose to ignore the individual 399M, since it appears to be a typo (i.e., it has the largest male dorsal scute length with a very small femur, which seems odd). Therefore, our dataset has 631 males instead of 633, as reported by @zatz2011.*
+
+```{r load and edit male data, echo=FALSE}
+MALES <- readRDS(file = here("data","original_data","original_male_data.rds"))
+
+MALES <- MALES[MALES$ID != "399M",] # potential outlier that might be a typing mistake. Exhibits the highest male dorsal scute length despite having a small femur length. 
+
+MALES$ID <- droplevels(MALES$ID)
+
+str(MALES)
+summary(MALES[,2:ncol(MALES)])
+```
+
+```{r save male data, echo=FALSE}
+saveRDS(MALES, file = here("data","processed_data","male_data.rds"))
+```
+
+# Exploratory data analysis
+
+The plot below illustrates the morph classification proposed by @zatz2011, in which major males exhibit longer fourth legs than minor males. In contrast, dorsal scute length shows substantial overlap between morphs, indicating that body size alone does not reliably distinguish them (Fig. 1).
+
+```{r plots 1, echo=FALSE}
+cores <- viridis(7)
+
+# Measurements per morph as defined by @Zatz2011
+p1 <- ggplot(MALES, aes(x = DSmm, y = F4mm, color = MorphZatz)) +
+  geom_point(size = 2.5, alpha = 0.7) +
+  scale_color_manual(values = cores[c(3,5)]) +
+  labs(x = "Dorsal scute length (mm)",
+       y = "Femur IV length (mm)") +
+  theme_classic() +
+  theme(
+    legend.position = "none"
+  ) +
+  annotate("text", x = Inf, y = Inf, label = "A",
+           hjust = 1.2, vjust = 1.5, size = 6, fontface = "bold")
+
+# Dorsal scute length
+p2 <- ggplot(MALES, aes(x = DSmm)) + 
+  geom_histogram(aes(y = ..density..), 
+                 bins = 25, 
+                 fill = "grey90", 
+                 color = "white") + 
+  geom_density(aes(color = MorphZatz), 
+               linewidth = 1.1) + 
+  scale_color_manual(values = cores[c(3,5)]) + 
+  labs(x = "Dorsal scute length (mm)", 
+       y = "Density") + 
+  theme_classic() + 
+  theme(legend.title = element_blank()) + 
+  annotate("text", x = Inf, y = Inf, label = "B", 
+           hjust = 1.2, vjust = 1.5, size = 6, fontface = "bold")
+```
+
+```{r plots 1 legend, echo=FALSE}
+#| label: fig-f4-ds-morphzatz
+#| fig-cap: "(A) Relationship between femur IV length and dorsal scute length for male morphs following the classification proposed by @zatz2011. In this species, dorsal scute length is a proxy for body size, whereas femur IV length reflects the size of the fourth pair of legs, which males use during territorial disputes. Major males display consistently longer femur IV lengths than minor males. (B) Distribution of dorsal scute length for all males. The histogram shows the overall unimodal size distribution in the population, while the density curves highlight the strong overlap between major and minor males."
+#| fig-alt: "Panel A shows a scatterplot of the relationship between femur IV length and dorsal scute length in Longiperna concolor males. Major males exhibit longer femur IV lengths (typically 30–60 mm), whereas minor males show shorter values (approximately 15–30 mm). Both morphs overlap extensively in dorsal scute length, which ranges from about 5 to 6 mm. Panel B shows a histogram of dorsal scute length for all males combined, overlaid with separate density curves for major and minor morphs. The distribution of dorsal scute length is unimodal, with substantial overlap between morphs and only slight differences in their density profiles."
+p1 + p2 + plot_layout(ncol = 2)
+```
+
+```{r include = FALSE}
+# Male dorsal scute length distribution plot for SuppMat
+ggplot(MALES, aes(x = DSmm)) + 
+  geom_histogram(aes(y = ..density..), 
+                 bins = 25, 
+                 fill = "gray80", 
+                 color = "black") + 
+  geom_density(alpha = 0.7, linewidth = 1) +
+  labs(x = "Dorsal scute length (mm)", 
+       y = "Density") + 
+  theme_classic() + 
+  theme(
+    axis.title = element_text(size = 16),
+    axis.text = element_text(size = 14),
+    legend.title = element_text(size = 14),
+    legend.text = element_text(size = 12)
+  )
+
+shapiro.test(MALES$DSmm)
+```
+
+
+Although males exhibit a unimodal distribution of dorsal scute length (Fig. 1b), the distribution of male femur IV length initially appears bimodal when examined without accounting for morph identity (Fig. 2a). However, once the data are partitioned by male morphs as defined by @zatz2011, it becomes evident that the distribution within the major morph is itself bimodal (Fig. 2b). This pattern prompted us to investigate the possibility of male trimorphism.
+
+```{r plots 2, echo=FALSE, warning=FALSE}
+# Overall male femur IV length distribution
+p3 <- ggplot(MALES, aes(x = F4mm)) +
+  geom_histogram(aes(y = ..density..), bins = 30, fill = "gray80", color = "black") +
+  geom_density(alpha = 0.7, linewidth = 1) +
+  xlim(5,70) +
+  labs(x = "Femur IV length (mm)",
+       y = "Density") +
+  theme_classic() +
+  annotate("text", x = Inf, y = Inf, label = "A", hjust = 1.2, vjust = 1.5, size = 6, fontface = "bold")
+
+# Density separated by MorphZatz
+p4 <- ggplot(MALES, aes(x = F4mm, fill = MorphZatz)) +
+  geom_density(alpha = 0.7) +
+  xlim(5,70) +
+  scale_fill_manual(values = cores[c(3,5)]) +
+  labs(x = "Femur IV length (mm)",
+       y = "Density") +
+  theme_classic() +
+  theme(legend.title = element_blank()) +
+  annotate("text", x = Inf, y = Inf, label = "B", hjust = 1.2, vjust = 1.5, size = 6, fontface = "bold")
+```
+
+```{r plots 2 legend, echo=FALSE}
+#| label: fig-f4-dens
+#| fig-cap: "Distribution of femur IV length in Longiperna concolor males.(A) Histogram and density plot showing the overall male distribution, which appears bimodal when morph identity is ignored.(B) Density curves separated by morphs following the classification proposed by @zatz2011. The major morph displays a bimodal distribution, whereas the minor morph forms a single mode."
+#| fig-alt: "Density plots illustrating the distribution of femur IV length in male Longiperna concolor. Panel A shows the overall distribution, which appears bimodal when all males are pooled together. Panel B shows separate density curves for major and minor morphs; the major morph displays a distinctly bimodal distribution, whereas the minor morph exhibits a single peak. This reveals that the apparent bimodality in the pooled data arises from the structure within the major morph."
+#| fig-height: 7
+p3 / p4
+```
