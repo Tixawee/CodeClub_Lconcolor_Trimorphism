@@ -228,7 +228,7 @@ laboratory*.
     Unemployed: present)
 4.  Miguel
 5.  Letícia
-6.  Laís
+6.  Laís A. Grossel (PhD: 2021-2026)
 7.  Solimary
 8.  Renato
 9.  Érika
