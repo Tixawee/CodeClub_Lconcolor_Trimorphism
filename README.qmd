@@ -232,8 +232,7 @@ Email: wellen\@ib.usp.br
 
 This section was created for the Code Club Git/GitHub practice.
 
-Add your *last name, position and the year you started in the
-laboratory*.
+Add your *last name, position and the year you started in the laboratory*.
 
 1.  Glauco Machado (forever)
 2.  Daniela Airi Kinoshita Master's: 2025-today
@@ -248,6 +247,7 @@ laboratory*.
 11. Guilherme
 12. Wellen Cristina Alves Bezerra (Master's: 2023–2025; PhD:
     2025–present)
+
 
 # Code Club conflict
 
