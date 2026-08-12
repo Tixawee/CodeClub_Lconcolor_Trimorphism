@@ -245,6 +245,7 @@ laboratory*.
 12. Wellen Cristina Alves Bezerra (Master's: 2023–2025; PhD:
     2025–present)
 
+
 # Code Club conflict
 
 This section was created for the Code Club Git/GitHub practice.
