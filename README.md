@@ -223,7 +223,7 @@ Add your *last name, position and the year you started in the
 laboratory*.
 
 1.  Glauco Machado (forever)
-2.  Daniela
+2.  Daniela Airi Kinoshita Master’s: 2025-today
 3.  Diego
 4.  Miguel
 5.  Letícia
