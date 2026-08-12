@@ -227,7 +227,7 @@ laboratory*.
 3.  Diego
 4.  Miguel
 5.  Letícia
-6.  Laís
+6.  Laís A. Grossel (PhD: 2021-2026)
 7.  Solimary
 8.  Renato
 9.  Érika
@@ -253,8 +253,7 @@ name, position, and year you started in the laboratory*.
 
 # References
 
-<div id="refs" class="references csl-bib-body hanging-indent"
-entry-spacing="0">
+<div id="refs" class="references csl-bib-body hanging-indent">
 
 <div id="ref-zatz2011" class="csl-entry">
 
