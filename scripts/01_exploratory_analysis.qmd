@@ -120,7 +120,7 @@ Although males exhibit a unimodal distribution of dorsal scute length (Fig. 1b),
 ```{r plots 2, echo=FALSE, warning=FALSE}
 # Overall male femur IV length distribution
 p3 <- ggplot(MALES, aes(x = F4mm)) +
-  geom_histogram(aes(y = ..density..), bins = 30, fill = "gray80", color = "black") +
+  geom_histogram(aes(y = ..density..), bins = 30, fill = "blue", color = "black") +
   geom_density(alpha = 0.7, linewidth = 1) +
   xlim(5,70) +
   labs(x = "Femur IV length (mm)",
