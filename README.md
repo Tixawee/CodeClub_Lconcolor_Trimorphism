@@ -224,7 +224,8 @@ laboratory*.
 
 1.  Glauco Machado (forever)
 2.  Daniela
-3.  Diego
+3.  Diego Solano Brenes (Master’s: 2019–2021; PhD: 2021–2026;
+    Unemployed: present)
 4.  Miguel
 5.  Letícia
 6.  Laís
@@ -253,8 +254,7 @@ name, position, and year you started in the laboratory*.
 
 # References
 
-<div id="refs" class="references csl-bib-body hanging-indent"
-entry-spacing="0">
+<div id="refs" class="references csl-bib-body hanging-indent">
 
 <div id="ref-zatz2011" class="csl-entry">
 
