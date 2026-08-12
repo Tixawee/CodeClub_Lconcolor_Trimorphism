@@ -1,5 +1,4 @@
 
-
 # Overview
 
 This repository contains the data and R scripts used in the study:
@@ -226,7 +225,7 @@ laboratory*.
 2.  Daniela
 3.  Diego
 4.  Miguel
-5.  Letícia
+5.  Leticia Padovani Holanda (undergraduate: 2024-present)
 6.  Laís
 7.  Solimary
 8.  Renato
@@ -253,8 +252,7 @@ name, position, and year you started in the laboratory*.
 
 # References
 
-<div id="refs" class="references csl-bib-body hanging-indent"
-entry-spacing="0">
+<div id="refs" class="references csl-bib-body hanging-indent">
 
 <div id="ref-zatz2011" class="csl-entry">
 
