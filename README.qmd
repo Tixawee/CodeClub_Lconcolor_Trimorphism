@@ -10,11 +10,22 @@ bibliography: referencias.bib
 
 This repository contains the data and R scripts used in the study:
 
-**Bezerra, W. C. A., & Machado, G. (2026). The three-morph problem: male trimorphism and alternative reproductive tactics in a Neotropical arachnid. *Animal Behaviour* 237:123614. 10.1016/j.anbehav.2026.123614.**
+**Bezerra, W. C. A., & Machado, G. (2026). The three-morph problem:
+male trimorphism and alternative reproductive tactics in a Neotropical
+arachnid. *Animal Behaviour* 237:123614.
+10.1016/j.anbehav.2026.123614.**
 
-The study provides the first evidence of male trimorphism in the Neotropical harvestman *Longiperna concolor* and investigates the allometric scaling of contest-related traits across morphs. It further evaluates whether morphological differentiation is associated with alternative reproductive tactics.
+The study provides the first evidence of male trimorphism in the
+Neotropical harvestman *Longiperna concolor* and investigates the
+allometric scaling of contest-related traits across morphs. It further
+evaluates whether morphological differentiation is associated with
+alternative reproductive tactics.
 
-This repository includes the original and processed datasets, and fully annotated analysis scripts used to generate all results and figures presented in the manuscript. The materials are provided to ensure transparency, reproducibility, and long-term accessibility of the analyses.
+This repository includes the original and processed datasets, and
+fully annotated analysis scripts used to generate all results and
+figures presented in the manuscript. The materials are provided to
+ensure transparency, reproducibility, and long-term accessibility of
+the analyses.
 
 # Repository structure
 
@@ -136,12 +147,13 @@ steps, which are used as inputs for subsequent analyses.
     body size scaling, and inter-morph variation.
 -   `04_behavioral_data.qmd` Reanalysis of male territorial behavior
     originally recorded by @zatz2011.
-    
+
 ## Supp
 
 Supplementary material figures.
 
--   `dorsal_scute_length.png` Dorsal scute length histogram for the supplementary material. 
+-   `dorsal_scute_length.png` Dorsal scute length histogram for the
+    supplementary material.
 
 # How to reproduce the results
 
@@ -184,14 +196,18 @@ available in `session_info.txt`.
 
 # License
 
-The scripts and data in this repository are associated with the manuscript:
-**The three-morph problem: male trimorphism and alternative reproductive tactics in a Neotropical arachnid**.
+The scripts and data in this repository are associated with the
+manuscript: **The three-morph problem: male trimorphism and
+alternative reproductive tactics in a Neotropical arachnid**.
 
 ## Usage restrictions:
 
-All scripts and processed datasets are made available under the terms of the **Creative Commons Attribution 4.0 International License (CC-BY 4.0)**.
+All scripts and processed datasets are made available under the terms
+of the **Creative Commons Attribution 4.0 International License (CC-BY
+4.0)**.
 
-You are free to share and adapt the material, provided that appropriate credit is given.
+You are free to share and adapt the material, provided that
+appropriate credit is given.
 
 ## Citation:
 
@@ -205,42 +221,47 @@ DOI: 10.1016/j.anbehav.2026.123614
 
 # Contact
 
-For questions, suggestions, or collaboration inquiries, please contact:
+For questions, suggestions, or collaboration inquiries, please
+contact:
 
 **Wellen C. A. Bezerra**
 
-Email: wellen@ib.usp.br
+Email: wellen\@ib.usp.br
 
 # Code Club contributors
 
 This section was created for the Code Club Git/GitHub practice.
 
-Add your *last name, position and the year you started in the laboratory*.
+Add your *last name, position and the year you started in the
+laboratory*.
 
-1. Glauco Machado (forever)
-2. Daniela
-3. Diego
-4. Miguel
-5. Letícia
-6. Laís
-7. Solimary
-8. Renato
-9. Érika
+1.  Glauco Machado (forever)
+2.  Daniela Airi Kinoshita Master's: 2025-today
+3.  Diego
+4.  Miguel
+5.  Letícia
+6.  Laís
+7.  Solimary
+8.  Renato
+9.  Érika
 10. Amanda
 11. Guilherme
-12. Wellen Cristina Alves Bezerra (Master's: 2023–2025; PhD: 2025–present)
+12. Wellen Cristina Alves Bezerra (Master's: 2023–2025; PhD:
+    2025–present)
 
 # Code Club conflict
 
 This section was created for the Code Club Git/GitHub practice.
 
-Each pair should modify the same line in their respective branches. The names below only identify the pairs. Replace them with your own *last name, position, and year you started in the laboratory*.
+Each pair should modify the same line in their respective branches.
+The names below only identify the pairs. Replace them with your own
+*last name, position, and year you started in the laboratory*.
 
-1. Glauco / Wellen
-2. Daniela / Diego
-3. Miguel / Letícia
-4. Laís / Solimary
-5. Renato / Érika
-6. Amanda / Guilherme
+1.  Glauco / Wellen
+2.  Daniela / Diego
+3.  Miguel / Letícia
+4.  Laís / Solimary
+5.  Renato / Érika
+6.  Amanda / Guilherme
 
 # References
